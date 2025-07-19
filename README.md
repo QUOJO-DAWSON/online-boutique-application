@@ -14,7 +14,7 @@ This project was built to:
 
 ## Overview
 
-This repository contains the source code and deployment configurations for the Online Boutique application, a cloud-native microservices demo application. The application is composed of multiple microservices written in different programming languages that communicate with each other using gRPC.
+This repository contains the source code and deployment configurations for the Online Boutique application. The application is a cloud-native microservices demo that simulates an e-commerce platform. It showcases how multiple microservices can work together in a Kubernetes environment with proper CI/CD practices.
 
 ## Features
 
@@ -76,6 +76,7 @@ The following secrets need to be configured in your GitHub repository:
 - Go 1.22+
 - Docker
 - Kubernetes cluster
+- GitHub account with repository access
 
 ### Local Development
 
@@ -85,7 +86,7 @@ The following secrets need to be configured in your GitHub repository:
    cd online-boutique-application
    ```
 
-2. Run the application locally:
+2. Run a microservice locally (example with ProductCatalogService):
    ```
    cd src/productcatalogservice
    go mod download
@@ -93,21 +94,25 @@ The following secrets need to be configured in your GitHub repository:
    ./product-catalog-service
    ```
 
+3. For full application deployment, use the Kubernetes manifests in the `kubernetes/` directory.
+
 ## Deployment
 
 The application is deployed using a GitOps approach:
 
-1. Changes are pushed to this repository
-2. CI pipeline builds and tests the code
-3. Docker images are built, scanned for vulnerabilities, and pushed to Docker Hub
-4. Kubernetes manifests are updated with new image tags
-5. GitOps repository is triggered to deploy the changes
+1. Changes are pushed to this repository via pull request
+2. GitHub Actions CI pipeline builds and tests the code
+3. Docker images are built, scanned for vulnerabilities with Trivy, and pushed to Docker Hub
+4. Kubernetes manifests are automatically updated with new image tags
+5. A separate GitOps repository is triggered to deploy the changes to the Kubernetes cluster
 
 ## Security
 
-- Container images are scanned for vulnerabilities using Trivy
-- Scan results are uploaded to GitHub Security tab
+- Container images are scanned for vulnerabilities using Trivy during the CI process
+- Scan results are uploaded to GitHub Security tab for visibility and tracking
+- Critical vulnerabilities can block the deployment pipeline
+- All microservices run with appropriate resource limits and non-root users
 
 ## License
 
-[Add license information here]
+This project is available under the Apache 2.0 license.
