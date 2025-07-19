@@ -1,0 +1,129 @@
+name: CI
+
+on: 
+    pull_request:
+        branches:
+        - main
+
+jobs:
+    Build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Go 1.22
+              uses: actions/setup-go@v5
+              with:
+                go-version: "1.22"
+
+            - name: build
+              run: |
+                cd ./src/productcatalogservice
+                go mod download
+                go build -o product-catalog-service
+
+            - name: test
+              run: |
+                cd ./src/productcatalogservice
+                go test ./...
+                
+    Code-Quality:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Go 1.22
+              uses: actions/setup-go@v5
+              with:
+                go-version: "1.22"
+                
+            - name: golangci-lint
+              uses: golangci/golangci-lint-action@v7
+              with:
+                version: v2.0
+                working-directory: ./src/productcatalogservice
+
+
+
+    Docker:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Login to Docker Hub
+              uses: docker/login-action@v3
+              with:
+                username: ${{ secrets.DOCKERHUB_USERNAME }}
+                password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Build and push
+              uses: docker/build-push-action@v6
+              with:
+                context: ./src/productcatalogservice/
+                file: ./src/productcatalogservice/Dockerfile
+                push: true
+                tags: ${{ secrets.DOCKERHUB_USERNAME }}/productcatalogservice:v${{ github.run_id }}
+                outputs: type=docker,dest=/tmp/productcatalogservice.tar
+
+            - name: Scan image with Trivy
+              uses: aquasecurity/trivy-action@master
+              with:
+                input: /tmp/productcatalogservice.tar
+                format: 'sarif'
+                output: 'trivy-results.sarif'
+                exit-code: '1'
+                ignore-unfixed: true
+                severity: 'CRITICAL,HIGH'
+                
+            - name: Upload Trivy scan results to GitHub Security tab
+              uses: github/codeql-action/upload-sarif@v2
+              if: always()
+              with:
+                sarif_file: 'trivy-results.sarif'
+
+
+    updatek8s:
+        runs-on: ubuntu-latest
+        needs: Docker
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                token: ${{ secrets.ACTIONS_PA_TOKEN }}
+
+            - name: Update tag in kubernetes deployment manifest
+              run: |
+                sed -i "s|image: .*|image: ${{ secrets.DOCKERHUB_USERNAME }}/productcatalogservice:v${{github.run_id}}|" kubernetes/productcatalogservice/deploy.yaml
+
+            - name: Commit and Push Changes
+              run: |
+                git config --global user.email "${{ secrets.USER_EMAIL }}"
+                git config --global user.name "${{ secrets.USER_NAME }}"
+                git add kubernetes/productcatalogservice/deploy.yaml
+                git commit -m "[CI]: Update product catalog image tag"
+                git push origin HEAD:main -f
+
+    trigger-gitops:
+        runs-on: ubuntu-latest
+        needs: updatek8s
+
+        steps:
+            - name: Trigger kustomization update in GitOps repo
+              env: 
+                GH_TOKEN: ${{ secrets.ACTIONS_PA_TOKEN }}
+              run: |
+                curl -X POST \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                https://api.github.com/repos/QUOJO-DAWSON/online-boutique-gitops/dispatches \
+                -d '{"event_type": "update-productcatalog-tag", "client_payload": {"new_tag": "v${{ github.run_id }}"}}'
