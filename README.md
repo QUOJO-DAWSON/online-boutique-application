@@ -59,6 +59,16 @@ The repository includes GitHub Actions workflows for continuous integration and 
 - **Update Kubernetes Manifests**: Updates deployment files with new image tags
 - **GitOps Trigger**: Triggers deployment in the GitOps repository
 
+### GitHub Actions Secrets
+
+The following secrets need to be configured in your GitHub repository:
+
+- `DOCKERHUB_USERNAME`: Your Docker Hub username
+- `DOCKERHUB_TOKEN`: Your Docker Hub access token
+- `ACTIONS_PA_TOKEN`: GitHub Personal Access Token with repo scope
+- `USER_EMAIL`: Email for git commits
+- `USER_NAME`: Username for git commits
+
 ## Development
 
 ### Prerequisites
