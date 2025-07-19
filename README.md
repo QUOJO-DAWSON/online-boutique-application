@@ -26,6 +26,13 @@ This repository contains the source code and deployment configurations for the O
 - **Containerized deployment with Docker**
 - **Scalable Kubernetes deployments**
 
+## Tools and Technologies
+
+- **Containerization**: Docker, Kubernetes
+- **CI/CD**: GitHub Actions
+- **Security**: Trivy for container scanning
+- **Deployment**: GitOps with separate configuration repository
+
 ## Architecture
 
 The application consists of the following microservices:
@@ -41,13 +48,6 @@ The application consists of the following microservices:
 - **ShippingService**: Shipping cost calculation
 - **AdService**: Advertisements service
 - **Redis-Cart**: Redis database for cart data
-
-## Tools and Technologies
-
-- **Containerization**: Docker, Kubernetes
-- **CI/CD**: GitHub Actions
-- **Security**: Trivy for container scanning
-- **Deployment**: GitOps with separate configuration repository
 
 ## CI/CD Pipeline
 
