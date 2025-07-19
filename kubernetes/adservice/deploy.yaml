@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: adservice
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: adservice
@@ -14,38 +14,40 @@ spec:
     spec:
       containers:
         - name: service
-          image: iamfet/adservice:v15797358403
+          image: dawsonkesson/adservice:v16319814565
           ports:
             - containerPort: 9555
           env:
             - name: PORT
               value: "9555"
+          livenessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            grpc:
+              port: 9555
+          readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            grpc:
+              port: 9555
           resources:
-            limits:
-              cpu: 300m
-              memory: 300Mi
             requests:
               cpu: 200m
               memory: 180Mi
-          livenessProbe:
-            grpc:
-              port: 9555
-            initialDelaySeconds: 5
-            periodSeconds: 5
-          readinessProbe:
-            grpc:
-              port: 9555
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            limits:
+              cpu: 300m
+              memory: 300Mi
+
 ---
+
 apiVersion: v1
 kind: Service
 metadata:
   name: adservice
 spec:
+  type: ClusterIP
+  selector:
+    app: adservice
   ports:
     - port: 9555
       targetPort: 9555
-  selector:
-    app: adservice
-  type: ClusterIP

@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: paymentservice
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: paymentservice
@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: service
-          image: iamfet/paymentservice:v15797358403
+          image: dawsonkesson/paymentservice:v16319814565
           ports:
             - containerPort: 50051
           env:
@@ -22,31 +22,33 @@ spec:
               value: "50051"
             - name: DISABLE_PROFILER
               value: "1"
+          livenessProbe:
+            periodSeconds: 5
+            grpc:
+              port: 50051
+          readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            grpc:
+              port: 50051
           resources:
-            limits:
-              cpu: 200m
-              memory: 128Mi
             requests:
               cpu: 100m
               memory: 64Mi
-          livenessProbe:
-            grpc:
-              port: 50051
-            periodSeconds: 5
-          readinessProbe:
-            grpc:
-              port: 50051
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
 ---
+
 apiVersion: v1
 kind: Service
 metadata:
   name: paymentservice
 spec:
+  type: ClusterIP
+  selector:
+    app: paymentservice
   ports:
     - port: 50051
       targetPort: 50051
-  selector:
-    app: paymentservice
-  type: ClusterIP

@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: cartservice
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: cartservice
@@ -14,40 +14,42 @@ spec:
     spec:
       containers:
         - name: service
-          image: iamfet/cartservice:v15797358403
+          image: dawsonkesson/cartservice:v16319814565
           ports:
             - containerPort: 7070
           env:
             - name: PORT
               value: "7070"
             - name: REDIS_ADDR
-              value: redis-cart:6379
+              value: "redis-cart:6379"
+          livenessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            grpc:
+              port: 7070
+          readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            grpc:
+              port: 7070
           resources:
-            limits:
-              cpu: 300m
-              memory: 300Mi
             requests:
               cpu: 200m
               memory: 180Mi
-          livenessProbe:
-            grpc:
-              port: 7070
-            initialDelaySeconds: 5
-            periodSeconds: 5
-          readinessProbe:
-            grpc:
-              port: 7070
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            limits:
+              cpu: 300m
+              memory: 300Mi
+
 ---
+
 apiVersion: v1
 kind: Service
 metadata:
   name: cartservice
 spec:
+  type: ClusterIP
+  selector:
+    app: cartservice
   ports:
     - port: 7070
       targetPort: 7070
-  selector:
-    app: cartservice
-  type: ClusterIP
