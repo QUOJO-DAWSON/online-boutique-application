@@ -24,7 +24,7 @@ This repository contains the source code and deployment configurations for the O
 - **Container security scanning with Trivy**
 - **Microservices communication via gRPC**
 - **Containerized deployment with Docker**
-- **Scalable Kubernetes deployments**
+- **Scalable Kubernetes deployments** 
 
 ## Tools and Technologies
 
