@@ -115,4 +115,4 @@ The application is deployed using a GitOps approach:
 
 ## License
 
-This project is available under the Apache 2.0 license.
+This project is available under the Apache 2.0 license. 
