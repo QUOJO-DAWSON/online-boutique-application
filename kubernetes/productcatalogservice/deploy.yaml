@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: service
-          image: dawsonkesson/productcatalogservice:v17277086048
+          image: dawsonkesson/productcatalogservice:v17277430794
           ports:
             - containerPort: 3550
           env:
