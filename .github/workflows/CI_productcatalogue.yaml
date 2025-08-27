@@ -1,130 +1,142 @@
-name: CI
+name: Product Catalog CI
 
 on: 
-    pull_request:
-        branches:
-        - main
+  pull_request:
+      branches:
+      - main
 
 jobs:
-    Build:
-        runs-on: ubuntu-latest
+  build-and-test:
+      name: Build & Test
+      runs-on: ubuntu-latest
+      steps:
+          - name: Checkout
+            uses: actions/checkout@v4
+          - name: Setup Go 1.22
+            uses: actions/setup-go@v5
+            with:
+              go-version: "1.22"
+          
+          - name: Download dependencies
+            working-directory: ./src/productcatalogservice
+            run: go mod download
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+          - name: Build application
+            working-directory: ./src/productcatalogservice
+            run: go build -v -o product-catalog-service
 
-            - name: Setup Go 1.22
-              uses: actions/setup-go@v5
-              with:
-                go-version: "1.22"
+          - name: test
+            working-directory: ./src/productcatalogservice
+            run: |
+              go test ./...
+            
+  Code-Quality:
+      name: Code Quality
+      runs-on: ubuntu-latest
+      needs: build-and-test
+      continue-on-error: true
+      steps:
+          - name: Checkout
+            uses: actions/checkout@v4
 
-            - name: build
-              run: |
-                cd ./src/productcatalogservice
-                go mod download
-                go build -o product-catalog-service
+          - name: Setup Go 1.22
+            uses: actions/setup-go@v5
+            with:
+              go-version: "1.22"
+              
+          - name: golangci-lint
+            uses: golangci/golangci-lint-action@v7
+            with:
+              version: latest
+              working-directory: ./src/productcatalogservice
+              args: --timeout=5m --output.text.path=stdout --output.sarif.path=golangci-lint.sarif
+              
+  Docker-build-and-scan-image:
+      runs-on: ubuntu-latest
+      needs: Code-Quality
+      steps:
+          - name: Checkout
+            uses: actions/checkout@v4
 
-            - name: test
-              run: |
-                cd ./src/productcatalogservice
-                go test ./...
-                
-    Code-Quality:
-        runs-on: ubuntu-latest
+          - name: Set up Docker Buildx
+            uses: docker/setup-buildx-action@v3
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+          - name: Login to Docker Hub
+            uses: docker/login-action@v3
+            with:
+              username: ${{ secrets.DOCKERHUB_USERNAME }}
+              password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-            - name: Setup Go 1.22
-              uses: actions/setup-go@v5
-              with:
-                go-version: "1.22"
-                
-            - name: golangci-lint
-              uses: golangci/golangci-lint-action@v7
-              with:
-                version: v2.0
-                working-directory: ./src/productcatalogservice
+          - name: Build and push Docker Image
+            uses: docker/build-push-action@v6
+            with:
+              context: ./src/productcatalogservice/
+              file: ./src/productcatalogservice/Dockerfile
+              push: true
+              tags: ${{ secrets.DOCKERHUB_USERNAME }}/productcatalogservice:v${{ github.run_id }}
+              outputs: type=docker,dest=/tmp/productcatalogservice.tar
 
+          - name: Run Trivy vulnerability scanner
+            uses: aquasecurity/trivy-action@master
+            continue-on-error: true
+            with:
+              input: /tmp/productcatalogservice.tar
+              format: 'sarif'
+              output: 'trivy-results.sarif'
+              exit-code: '0'
+              ignore-unfixed: true
+              severity: 'CRITICAL,HIGH'
+              
+          - name: Upload Trivy scan results to GitHub Security tab
+            uses: github/codeql-action/upload-sarif@v3
+            if: always()
+            with:
+              sarif_file: 'trivy-results.sarif'
 
+  update-kubernetes-manifest:
+      name: Update K8s Manifest
+      runs-on: ubuntu-latest
+      needs: Docker-build-and-scan-image
+      steps:
+          - name: Checkout
+            uses: actions/checkout@v4
+            with:
+              token: ${{ secrets.ACTIONS_PA_TOKEN }}
 
-    Docker:
-        runs-on: ubuntu-latest
+          - name: Configure Git
+            run: |
+              git config --global user.email "${{ secrets.USER_EMAIL }}"
+              git config --global user.name "${{ secrets.USER_NAME }}"
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+          - name: Update deployment manifest
+            run: |
+              IMAGE_TAG="${{ secrets.DOCKERHUB_USERNAME }}/productcatalogservice:v${{ github.run_id }}"
+              sed -i "s|image: .*|image: ${IMAGE_TAG}|" kubernetes/productcatalogservice/deploy.yaml
 
-            - name: Login to Docker Hub
-              uses: docker/login-action@v3
-              with:
-                username: ${{ secrets.DOCKERHUB_USERNAME }}
-                password: ${{ secrets.DOCKERHUB_TOKEN }}
+          - name: Commit and push changes
+            run: |
+              git add kubernetes/productcatalogservice/deploy.yaml
+              git commit -m "ci: update ${{ env.IMAGE_NAME }} image to v${{ github.run_id }}"
+              git push origin HEAD:main -f
+              
+  trigger-gitops:
+      name: Trigger GitOps
+      runs-on: ubuntu-latest
+      needs: update-kubernetes-manifest
 
-            - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@v3
-
-            - name: Build and push
-              uses: docker/build-push-action@v6
-              with:
-                context: ./src/productcatalogservice/
-                file: ./src/productcatalogservice/Dockerfile
-                push: true
-                tags: ${{ secrets.DOCKERHUB_USERNAME }}/productcatalogservice:v${{ github.run_id }}
-                outputs: type=docker,dest=/tmp/productcatalogservice.tar
-
-            - name: Scan image with Trivy
-              uses: aquasecurity/trivy-action@master
-              continue-on-error: true
-              with:
-                input: /tmp/productcatalogservice.tar
-                format: 'sarif'
-                output: 'trivy-results.sarif'
-                exit-code: '0'
-                ignore-unfixed: true
-                severity: 'CRITICAL,HIGH'
-                
-            - name: Upload Trivy scan results to GitHub Security tab
-              uses: github/codeql-action/upload-sarif@v3
-              if: always()
-              with:
-                sarif_file: 'trivy-results.sarif'
-
-
-    update-kubernetes-manifest:
-        runs-on: ubuntu-latest
-        needs: Docker
-
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-              with:
-                token: ${{ secrets.ACTIONS_PA_TOKEN }}
-
-            - name: Update tag in kubernetes deployment manifest
-              run: |
-                sed -i "s|image: .*|image: ${{ secrets.DOCKERHUB_USERNAME }}/productcatalogservice:v${{github.run_id}}|" kubernetes/productcatalogservice/deploy.yaml
-
-            - name: Commit and Push Changes
-              run: |
-                git config --global user.email "${{ secrets.USER_EMAIL }}"
-                git config --global user.name "${{ secrets.USER_NAME }}"
-                git add kubernetes/productcatalogservice/deploy.yaml
-                git commit -m "[CI]: Update product catalog image tag"
-                git push origin HEAD:main -f
-
-    trigger-gitops:
-        runs-on: ubuntu-latest
-        needs: update-kubernetes-manifest
-
-        steps:
-            - name: Trigger kustomization update in GitOps repo
-              env: 
-                GH_TOKEN: ${{ secrets.ACTIONS_PA_TOKEN }}
-              run: |
-                curl -X POST \
-                -H "Accept: application/vnd.github+json" \
-                -H "Authorization: Bearer $GH_TOKEN" \
-                https://api.github.com/repos/QUOJO-DAWSON/online-boutique-gitops/dispatches \
-                -d '{"event_type": "update-productcatalog-tag", "client_payload": {"new_tag": "v${{ github.run_id }}"}}'
+      steps:
+          - name: Trigger kustomization update in GitOps repo
+            env: 
+              GH_TOKEN: ${{ secrets.ACTIONS_PA_TOKEN }}
+            run: |
+              curl -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              https://api.github.com/repos/iamfet/gitops-online-boutique/dispatches \
+              -d '{
+                "event_type": "update-productcatalog-tag", 
+                "client_payload": {
+                  "new_tag": "v${{ github.run_id }}"
+                  }
+                }'
