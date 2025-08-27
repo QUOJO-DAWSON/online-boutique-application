@@ -113,6 +113,16 @@ The application is deployed using a GitOps approach:
 - Critical vulnerabilities can block the deployment pipeline
 - All microservices run with appropriate resource limits and non-root users
 
+## Related Projects
+
+- **[Infrastructure Repository](https://github.com/QUOJO-DAWSON/eks-infra-automation)** - EKS infrastructure automation
+- **[GitOps Repository](https://github.com/QUOJO-DAWSON/online-boutique-gitops)** - Deployment configurations
+- **[Google's Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo)** - Original upstream project
+
+##  Acknowledgments
+
+This project is built upon the source code from [Google's Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo), which provides the foundational microservices architecture. We extend our gratitude to Google Cloud Platform for creating and maintaining this excellent demonstration application.
+
 ## License
 
 This project is available under the Apache 2.0 license. 
