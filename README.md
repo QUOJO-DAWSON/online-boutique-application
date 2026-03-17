@@ -1,128 +1,151 @@
-# Online Boutique Application
+﻿# online-boutique-application
 
-This project is a full DevOps pipeline built around a cloud-native microservices-based application inspired by [Google's Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo). It demonstrates modern best practices in CI/CD, Kubernetes, observability, GitOps, and infrastructure as code (IaC).
+> Source code, Dockerfiles, and CI pipelines for the Online Boutique microservices application. Images are built, scanned, and pushed to Docker Hub — then deployed to EKS via GitOps in [online-boutique-gitops](https://github.com/QUOJO-DAWSON/online-boutique-gitops), running on the platform provisioned in [eks-infra-automation](https://github.com/QUOJO-DAWSON/eks-infra-automation).
 
-## Why This Project?
+---
 
-This project was built to:
+## What This Is
 
-- Showcase end-to-end DevOps expertise and best practices
-- Demonstrate practical implementation of CI/CD pipelines
-- Provide a real-world example of containerized microservices
-- Illustrate security integration in the deployment pipeline
-- Function as a portfolio piece for DevOps engineers
+This is the application layer of a three-repo DevOps portfolio. It owns the source code and the build pipeline — nothing else. It does not define how the app is deployed, what cluster it runs on, or what policies govern it. Those concerns live in their own repos.
 
-## Overview
+The separation is intentional. In a real engineering org, the team that writes the code doesn't own the deployment manifests, and the platform team doesn't own the application source. This repo reflects that boundary.
 
-This repository contains the source code and deployment configurations for the Online Boutique application. The application is a cloud-native microservices demo that simulates an e-commerce platform. It showcases how multiple microservices can work together in a Kubernetes environment with proper CI/CD practices.
+---
 
-## Features
+## Three-Repo Architecture
+```
+online-boutique-application  (this repo)
+        │
+        │  builds images → pushes to Docker Hub
+        │  triggers repository_dispatch
+        ▼
+online-boutique-gitops
+        │
+        │  Kustomize overlays updated with new image tags
+        │  ArgoCD detects change, syncs to cluster
+        ▼
+eks-infra-automation
+        │
+        │  EKS cluster, ArgoCD, Kyverno, Istio, Prometheus
+        └─ Platform that runs everything
+```
 
-- **Kubernetes-native microservices architecture**
-- **GitHub Actions for Automated CI/CD pipelines**
-- **GitOps-style continuous delivery**
-- **Container security scanning with Trivy**
-- **Microservices communication via gRPC**
-- **Containerized deployment with Docker**
-- **Scalable Kubernetes deployments** 
+---
 
-## Tools and Technologies
+## Services
 
-- **Containerization**: Docker, Kubernetes
-- **CI/CD**: GitHub Actions
-- **Security**: Trivy for container scanning
-- **Deployment**: GitOps with separate configuration repository
+| Service | Language | Responsibility |
+|---------|----------|---------------|
+| adservice | Java | Serves context-based ads |
+| cartservice | C# | Manages shopping cart via Redis |
+| checkoutservice | Go | Orchestrates the checkout flow |
+| currencyservice | Node.js | Currency conversion using ECB rates |
+| emailservice | Python | Sends order confirmation emails |
+| frontend | Go | Serves the web UI, aggregates backend calls |
+| paymentservice | Node.js | Processes payments via Stripe |
+| productcatalogservice | Go | Serves product listings from JSON |
+| recommendationservice | Python | Returns product recommendations |
+| shippingservice | Go | Calculates shipping costs |
+| redis-cart | Redis | Cart data store |
 
-## Architecture
-
-The application consists of the following microservices:
-
-- **Frontend**: Web interface
-- **ProductCatalogService**: Product catalog API
-- **CartService**: Shopping cart service
-- **CheckoutService**: Checkout processing
-- **CurrencyService**: Currency conversion
-- **EmailService**: Email notification service
-- **PaymentService**: Payment processing
-- **RecommendationService**: Product recommendation
-- **ShippingService**: Shipping cost calculation
-- **AdService**: Advertisements service
-- **Redis-Cart**: Redis database for cart data
+---
 
 ## CI/CD Pipeline
 
-The repository includes GitHub Actions workflows for continuous integration and deployment:
+Two workflows handle the build pipeline:
 
-- **Build**: Compiles and tests the code
-- **Code-Quality**: Runs linting and code quality checks
-- **Docker**: Builds and pushes Docker images with security scanning
-- **Update Kubernetes Manifests**: Updates deployment files with new image tags
-- **GitOps Trigger**: Triggers deployment in the GitOps repository
+### `docker/dockerbuild-microservices.yaml` — Bulk build (push trigger)
+Builds and pushes Docker images for all services except productcatalogservice on every push to main. No tests, no quality gates — pure build and push. Services covered: adservice, cartservice, checkoutservice, currencyservice, emailservice, frontend, paymentservice, recommendationservice, shippingservice.
 
-### GitHub Actions Secrets
+### `.github/workflows/CI_productcatalogue.yaml` — Dedicated productcatalog pipeline (PR trigger)
+productcatalogservice has its own dedicated pipeline because it is the only service with Go unit tests and lint checks. The pipeline runs in sequence:
+```
+Build & Test → Code Quality (golangci-lint) → Docker Build + Trivy Scan → Update K8s manifest → Trigger GitOps
+```
 
-The following secrets need to be configured in your GitHub repository:
+The final step fires a `repository_dispatch` to `online-boutique-gitops`, which automatically updates the `overlays/dev/kustomization.yaml` image tag via a `yq` patch — no manual intervention required.
 
-- `DOCKERHUB_USERNAME`: Your Docker Hub username
-- `DOCKERHUB_TOKEN`: Your Docker Hub access token
-- `ACTIONS_PA_TOKEN`: GitHub Personal Access Token with repo scope
-- `USER_EMAIL`: Email for git commits
-- `USER_NAME`: Username for git commits
+---
 
-## Development
+## Image Tagging Convention
 
-### Prerequisites
+All images follow the convention `dawsonkesson/<service>:v<github_run_id>` — for example `dawsonkesson/frontend:v16319814565`. No `latest` tags are ever pushed. This is enforced by the Kyverno `disallow-latest-tag` policy on the EKS cluster, which will block any deployment that attempts to use a mutable tag.
 
-- Go 1.22+
-- Docker
-- Kubernetes cluster
-- GitHub account with repository access
-
-### Local Development
-
-1. Clone the repository:
-   ```
-   git clone https://github.com/your-username/online-boutique-application.git
-   cd online-boutique-application
-   ```
-
-2. Run a microservice locally (example with ProductCatalogService):
-   ```
-   cd src/productcatalogservice
-   go mod download
-   go build -o product-catalog-service
-   ./product-catalog-service
-   ```
-
-3. For full application deployment, use the Kubernetes manifests in the `kubernetes/` directory.
-
-## Deployment
-
-The application is deployed using a GitOps approach:
-
-1. Changes are pushed to this repository via pull request
-2. GitHub Actions CI pipeline builds and tests the code
-3. Docker images are built, scanned for vulnerabilities with Trivy, and pushed to Docker Hub
-4. Kubernetes manifests are automatically updated with new image tags
-5. A separate GitOps repository is triggered to deploy the changes to the Kubernetes cluster
+---
 
 ## Security
 
-- Container images are scanned for vulnerabilities using Trivy during the CI process
-- Scan results are uploaded to GitHub Security tab for visibility and tracking
-- Critical vulnerabilities can block the deployment pipeline
-- All microservices run with appropriate resource limits and non-root users
+**Trivy container scanning** runs in the productcatalog pipeline after the Docker build. The image tarball is scanned for CRITICAL and HIGH CVEs before being pushed. Results are uploaded to the GitHub Security tab as SARIF. The scan runs with `exit-code: 0` — it reports but does not block on vulnerabilities in upstream dependencies outside our control.
 
-## Related Projects
+**No secrets in code or CI environment.** The Stripe API key is pulled from AWS Secrets Manager at runtime by the External Secrets Operator running in the cluster. The only secrets in GitHub Actions are Docker Hub credentials and a PAT for cross-repo dispatch.
 
-- **[Infrastructure Repository](https://github.com/QUOJO-DAWSON/eks-infra-automation)** - EKS infrastructure automation
-- **[GitOps Repository](https://github.com/QUOJO-DAWSON/online-boutique-gitops)** - Deployment configurations
-- **[Google's Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo)** - Original upstream project
+---
 
-##  Acknowledgments
+## Repository Structure
+```
+online-boutique-application/
+├── .github/
+│   └── workflows/
+│       └── CI_productcatalogue.yaml   # Full CI pipeline for productcatalogservice
+├── docker/
+│   └── dockerbuild-microservices.yaml # Bulk image build for all other services
+├── kubernetes/                         # ⚠️ Reference only — see note below
+│   ├── README.md
+│   └── <service>/deploy.yaml          # Last-built image tag record per service
+└── src/
+    ├── adservice/
+    ├── cartservice/
+    ├── checkoutservice/
+    ├── currencyservice/
+    ├── emailservice/
+    ├── frontend/
+    ├── paymentservice/
+    ├── productcatalogservice/
+    ├── recommendationservice/
+    ├── shippingservice/
+    └── shoppingassistantservice/
+```
 
-This project is built upon the source code from [Google's Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo), which provides the foundational microservices architecture. We extend our gratitude to Google Cloud Platform for creating and maintaining this excellent demonstration application.
+> The `kubernetes/` directory is **not** the deployment source of truth. All deployments are managed via [online-boutique-gitops](https://github.com/QUOJO-DAWSON/online-boutique-gitops). The `productcatalogservice/deploy.yaml` in this folder is updated automatically by CI as a tag tracking record only.
 
-## License
+---
 
-This project is available under the Apache 2.0 license. 
+## Local Development
+
+Run productcatalogservice locally:
+```bash
+cd src/productcatalogservice
+go mod download
+go build -o product-catalog-service
+./product-catalog-service
+```
+
+For full application deployment, the cluster and GitOps setup is defined in the platform and gitops repos.
+
+---
+
+## Required GitHub Secrets
+
+| Secret | Purpose |
+|--------|---------|
+| `DOCKERHUB_USERNAME` | Docker Hub login |
+| `DOCKERHUB_TOKEN` | Docker Hub push access |
+| `ACTIONS_PA_TOKEN` | Cross-repo dispatch to online-boutique-gitops |
+| `USER_EMAIL` | Git commit identity for manifest updates |
+| `USER_NAME` | Git commit identity for manifest updates |
+
+---
+
+## Upstream
+
+This project is built on top of [Google Cloud Platform's microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo), modified for this portfolio with custom CI pipelines, Docker Hub publishing, and GitOps integration.
+
+---
+
+## Author
+
+**George Dawson-Kesson** — AWS Certified Solutions Architect – Associate
+Portfolio: [gdawsonkesson.com](https://gdawsonkesson.com)
+GitHub: [QUOJO-DAWSON](https://github.com/QUOJO-DAWSON)
+Platform repo: [eks-infra-automation](https://github.com/QUOJO-DAWSON/eks-infra-automation)
+GitOps repo: [online-boutique-gitops](https://github.com/QUOJO-DAWSON/online-boutique-gitops)
