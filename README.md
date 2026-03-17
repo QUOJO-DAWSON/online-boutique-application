@@ -144,7 +144,7 @@ This project is built on top of [Google Cloud Platform's microservices-demo](htt
 
 ## Author
 
-**George Dawson-Kesson** — AWS Certified Solutions Architect – Associate
+**George Dawson-Kesson** — AWS Certified Solutions Architect – Associate (SAA-C03)
 Portfolio: [gdawsonkesson.com](https://gdawsonkesson.com)
 GitHub: [QUOJO-DAWSON](https://github.com/QUOJO-DAWSON)
 Platform repo: [eks-infra-automation](https://github.com/QUOJO-DAWSON/eks-infra-automation)
