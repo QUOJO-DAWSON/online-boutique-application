@@ -1,6 +1,6 @@
 ﻿# online-boutique-application
 
-> Source code, Dockerfiles, and CI pipelines for the Online Boutique microservices application. Images are built, scanned, and pushed to Docker Hub — then deployed to EKS via GitOps in [online-boutique-gitops](https://github.com/QUOJO-DAWSON/online-boutique-gitops), running on the platform provisioned in [eks-infra-automation](https://github.com/QUOJO-DAWSON/eks-infra-automation).
+> Source code, Dockerfiles, and CI pipelines for the Online Boutique microservices application. Images are built, scanned, and pushed to Docker Hub — then deployed to EKS via GitOps in [online-boutique-gitops](https://github.com/gdawsonkesson/online-boutique-gitops), running on the platform provisioned in [eks-infra-automation](https://github.com/gdawsonkesson/eks-infra-automation).
 
 ---
 
@@ -106,7 +106,7 @@ online-boutique-application/
     └── shoppingassistantservice/
 ```
 
-> The `kubernetes/` directory is **not** the deployment source of truth. All deployments are managed via [online-boutique-gitops](https://github.com/QUOJO-DAWSON/online-boutique-gitops). The `productcatalogservice/deploy.yaml` in this folder is updated automatically by CI as a tag tracking record only.
+> The `kubernetes/` directory is **not** the deployment source of truth. All deployments are managed via [online-boutique-gitops](https://github.com/gdawsonkesson/online-boutique-gitops). The `productcatalogservice/deploy.yaml` in this folder is updated automatically by CI as a tag tracking record only.
 
 ---
 
@@ -146,6 +146,6 @@ This project is built on top of [Google Cloud Platform's microservices-demo](htt
 
 **George Dawson-Kesson** — AWS Certified Solutions Architect – Associate (SAA-C03)
 Portfolio: [gdawsonkesson.com](https://gdawsonkesson.com)
-GitHub: [QUOJO-DAWSON](https://github.com/QUOJO-DAWSON)
-Platform repo: [eks-infra-automation](https://github.com/QUOJO-DAWSON/eks-infra-automation)
-GitOps repo: [online-boutique-gitops](https://github.com/QUOJO-DAWSON/online-boutique-gitops)
+GitHub: [gdawsonkesson](https://github.com/gdawsonkesson)
+Platform repo: [eks-infra-automation](https://github.com/gdawsonkesson/eks-infra-automation)
+GitOps repo: [online-boutique-gitops](https://github.com/gdawsonkesson/online-boutique-gitops)
